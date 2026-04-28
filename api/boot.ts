@@ -10,6 +10,14 @@ import path from "path";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
+// CORS — allow Cloudflare Pages to access the API
+app.use("*", cors({
+  origin: "*",  // ← allows any origin (safe for public API)
+  allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowHeaders: ["Content-Type", "Authorization", "x-admin-token"],
+  credentials: true,
+}));
+
 // Ensure uploads directory exists
 const uploadsDir = path.resolve(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) {
