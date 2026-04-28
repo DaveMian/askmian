@@ -10,13 +10,20 @@ import path from "path";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
-// CORS — allow Cloudflare Pages to access the API
-app.use("*", cors({
-  origin: "*",  // ← allows any origin (safe for public API)
-  allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowHeaders: ["Content-Type", "Authorization", "x-admin-token"],
-  credentials: true,
-}));
+// CORS - custom middleware (works with esbuild bundling)
+app.use("*", async (c, next) => {
+  const origin = c.req.header("Origin") || "*";
+  c.header("Access-Control-Allow-Origin", origin);
+  c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  c.header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-admin-token");
+  c.header("Access-Control-Allow-Credentials", "true");
+
+  if (c.req.method === "OPTIONS") {
+    return c.text("", 204);
+  }
+
+  return next();
+});
 
 // Ensure uploads directory exists
 const uploadsDir = path.resolve(process.cwd(), "uploads");
@@ -29,8 +36,8 @@ app.post("/api/upload", bodyLimit({ maxSize: 20 * 1024 * 1024 }), async (c) => {
   try {
     const formData = await c.req.formData();
     const file = formData.get("file") as File | null;
-    const field = formData.get("field") as string || "document";
-    const appId = formData.get("applicationId") as string || "unknown";
+    const field = (formData.get("field") as string) || "document";
+    const appId = (formData.get("applicationId") as string) || "unknown";
 
     if (!file) {
       return c.json({ error: "No file provided" }, 400);
@@ -100,8 +107,6 @@ export default app;
 
 if (env.isProduction) {
   const { serve } = await import("@hono/node-server");
-  const { serveStaticFiles } = await import("./lib/vite");
-  serveStaticFiles(app);
 
   const port = parseInt(process.env.PORT || "3000");
   serve({ fetch: app.fetch, port }, () => {

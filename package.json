@@ -1,7 +1,7 @@
 {
   "name": "askmian-backend",
   "version": "1.0.0",
-  "description": "Ask Mian API server — Hono + tRPC + Drizzle ORM + MySQL",
+  "description": "Ask Mian API server - Hono + tRPC + Drizzle ORM + MySQL",
   "type": "module",
   "scripts": {
     "build": "esbuild api/boot.ts --platform=node --bundle --format=esm --outdir=dist --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\"",
@@ -9,8 +9,7 @@
     "dev": "tsx api/boot.ts",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "check": "tsc -b"
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",
