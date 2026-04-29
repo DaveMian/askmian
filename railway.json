@@ -2,16 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "nixpacksPlan": {
-      "phases": {
-        "setup": {
-          "nixPkgs": ["nodejs_20"]
-        },
-        "build": {
-          "cmds": ["npm install && node scripts/build.cjs"]
-        }
-      }
-    }
+    "buildCommand": "npm install && node scripts/build.cjs"
   },
   "deploy": {
     "startCommand": "NODE_ENV=production node dist/boot.js",

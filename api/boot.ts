@@ -7,7 +7,6 @@ import { createContext } from "./context";
 import { env } from "./lib/env";
 import fs from "fs";
 import path from "path";
-import { sql } from "drizzle-orm";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -97,13 +96,14 @@ app.use("/uploads/*", async (c) => {
 app.get("/health", async (c) => {
   try {
     // Test database connection
-    const { db } = await import("./db/client");
-    const result = await db.execute(sql`SELECT 1 as test`);
+    const { getDb } = await import("./queries/connection");
+    const db = getDb();
+    const result = await db.execute("SELECT 1 as test");
     
     return c.json({
       status: "ok",
       time: new Date().toISOString(),
-      db: "connected",
+      db: result ? "connected" : "disconnected",
       env: env.isProduction ? "production" : "development",
       uploadDir: fs.existsSync(uploadsDir) ? "ready" : "missing",
     });
@@ -135,6 +135,4 @@ if (env.isProduction) {
 
   const port = parseInt(process.env.PORT || "3000");
   serve({ fetch: app.fetch, port }, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-  });
-}
+    console.l
