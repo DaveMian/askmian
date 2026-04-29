@@ -91,6 +91,7 @@ function baseTemplate(content: string): string {
 export async function sendApplicationConfirmation(data: {
   to: string;
   appId: number;
+  trackingCode: string;
   fullName: string;
   visaType: string;
   paymentMethod: string;
@@ -102,7 +103,7 @@ export async function sendApplicationConfirmation(data: {
     
     <div style="background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:20px;margin:20px 0;">
       <p style="margin:0 0 8px;color:#D4AF37;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Application Details</p>
-      <p style="margin:4px 0;"><strong style="color:#999;">Application ID:</strong> <span style="color:#D4AF37;font-weight:bold;">#${data.appId}</span></p>
+      <p style="margin:4px 0;"><strong style="color:#999;">Tracking Number:</strong> <span style="color:#D4AF37;font-weight:bold;font-family:monospace;">${data.trackingCode}</span></p>
       <p style="margin:4px 0;"><strong style="color:#999;">Visa Type:</strong> ${data.visaType}</p>
       <p style="margin:4px 0;"><strong style="color:#999;">Payment Method:</strong> ${data.paymentMethod}</p>
       <p style="margin:4px 0;"><strong style="color:#999;">Processing Time:</strong> 5 business days</p>
@@ -116,18 +117,19 @@ export async function sendApplicationConfirmation(data: {
       <li>You receive your visa via email and WhatsApp</li>
     </ol>
     
-    <p style="margin-top:20px;">You can track your application status anytime using your Application ID:</p>
+    <p style="margin-top:20px;">Track your application anytime with your tracking number:</p>
     <a href="https://askmian.com/#/track" style="display:inline-block;background:#D4AF37;color:#000;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;margin-top:8px;">Track Your Application</a>
     
     <p style="margin-top:20px;color:#999;font-size:12px;">If you have any questions, reply to this email or contact us on WhatsApp at +971 55 868 9543.</p>
   `);
 
-  return sendViaResend({ to: data.to, subject: `ASK MIAN - Application #${data.appId} Received`, html });
+  return sendViaResend({ to: data.to, subject: `ASK MIAN - Application ${data.trackingCode} Received`, html });
 }
 
 // Admin notification when new application arrives
 export async function sendAdminNotification(data: {
   appId: number;
+  trackingCode: string;
   fullName: string;
   visaType: string;
   phone: string;
@@ -145,7 +147,7 @@ export async function sendAdminNotification(data: {
     
     <div style="background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:20px;margin:20px 0;">
       <p style="margin:0 0 8px;color:#D4AF37;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Application Details</p>
-      <p style="margin:4px 0;"><strong style="color:#999;">Application ID:</strong> <span style="color:#D4AF37;font-weight:bold;">#${data.appId}</span></p>
+      <p style="margin:4px 0;"><strong style="color:#999;">Tracking Number:</strong> <span style="color:#D4AF37;font-weight:bold;font-family:monospace;">${data.trackingCode}</span></p>
       <p style="margin:4px 0;"><strong style="color:#999;">Name:</strong> ${data.fullName}</p>
       <p style="margin:4px 0;"><strong style="color:#999;">Visa Type:</strong> ${data.visaType}</p>
       <p style="margin:4px 0;"><strong style="color:#999;">Phone:</strong> ${data.phone}</p>
@@ -158,7 +160,7 @@ export async function sendAdminNotification(data: {
 
   return sendViaResend({
     to: ADMIN_EMAIL,
-    subject: `ASK MIAN - New Application #${data.appId} from ${data.fullName}`,
+    subject: `ASK MIAN - New Application ${data.trackingCode} from ${data.fullName}`,
     html,
   });
 }
@@ -167,7 +169,7 @@ export async function sendAdminNotification(data: {
 export async function sendStatusUpdate(data: {
   to: string;
   fullName: string;
-  appId: number;
+  trackingCode: string;
   visaType: string;
   status: string;
 }): Promise<{ success: boolean; error?: string }> {
@@ -193,7 +195,7 @@ export async function sendStatusUpdate(data: {
     <p>There has been an update to your visa application.</p>
     
     <div style="background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
-      <p style="margin:0 0 8px;color:#999;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Application #${data.appId}</p>
+      <p style="margin:0 0 8px;color:#999;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Tracking ${data.trackingCode}</p>
       <p style="margin:4px 0;color:#ccc;">${data.visaType}</p>
       <div style="display:inline-block;background:${statusColors[data.status] || "#666"}20;border:1px solid ${statusColors[data.status] || "#666"};border-radius:20px;padding:6px 16px;margin-top:12px;">
         <span style="color:${statusColors[data.status] || "#ccc"};font-weight:bold;text-transform:uppercase;font-size:12px;">${data.status.replace(/_/g, " ")}</span>
@@ -210,7 +212,7 @@ export async function sendStatusUpdate(data: {
 
   return sendViaResend({
     to: data.to,
-    subject: `ASK MIAN - Application #${data.appId} Status: ${data.status.replace(/_/g, " ").toUpperCase()}`,
+    subject: `ASK MIAN - ${data.trackingCode} Status: ${data.status.replace(/_/g, " ").toUpperCase()}`,
     html,
   });
 }

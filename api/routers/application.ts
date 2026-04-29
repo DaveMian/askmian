@@ -2,8 +2,9 @@ import { z } from "zod";
 import { createRouter, publicQuery } from "../middleware";
 import { getDb } from "../queries/connection";
 import { applications } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { sendApplicationConfirmation, sendAdminNotification } from "../lib/email";
+import { generateTrackingCode } from "../lib/tracking";
 
 export const applicationRouter = createRouter({
   create: publicQuery
@@ -29,7 +30,12 @@ export const applicationRouter = createRouter({
     )
     .mutation(async ({ input }) => {
       const db = getDb();
+
+      // Generate secure tracking code
+      const trackingCode = generateTrackingCode();
+
       const result = await db.insert(applications).values({
+        trackingCode,
         fullName: input.fullName,
         nationality: input.nationality,
         currentLocation: input.currentLocation || null,
@@ -56,6 +62,7 @@ export const applicationRouter = createRouter({
         await sendApplicationConfirmation({
           to: input.email,
           appId,
+          trackingCode,
           fullName: input.fullName,
           visaType: input.visaType,
           paymentMethod: input.paymentMethod || "",
@@ -65,6 +72,7 @@ export const applicationRouter = createRouter({
       // Send admin notification
       await sendAdminNotification({
         appId,
+        trackingCode,
         fullName: input.fullName,
         visaType: input.visaType,
         phone: input.phone,
@@ -72,23 +80,24 @@ export const applicationRouter = createRouter({
         paymentMethod: input.paymentMethod || "",
       });
 
-      return { id: appId };
+      return { id: appId, trackingCode };
     }),
 
-  // Public status tracking - no auth needed
+  // Public status tracking - search by tracking code
   track: publicQuery
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ trackingCode: z.string() }))
     .query(async ({ input }) => {
       const db = getDb();
       const rows = await db
         .select()
         .from(applications)
-        .where(eq(applications.id, input.id));
+        .where(eq(applications.trackingCode, input.trackingCode.toUpperCase().trim()));
       const app = rows[0];
       if (!app) return null;
       // Return only safe fields for public view
       return {
         id: app.id,
+        trackingCode: app.trackingCode,
         fullName: app.fullName,
         visaType: app.visaType,
         status: app.status,

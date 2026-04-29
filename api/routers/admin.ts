@@ -15,12 +15,13 @@ export const adminRouter = createRouter({
     const processing = all.filter((a) => a.status === "processing").length;
     const completed = all.filter((a) => a.status === "completed").length;
     const rejected = all.filter((a) => a.status === "rejected").length;
+    const docsRequested = all.filter((a) => a.status === "documents_requested").length;
     const paid = all.filter(
       (a) => a.paymentStatus === "paid" || a.paymentStatus === "succeeded"
     ).length;
     const revenue = all.reduce((sum, a) => sum + (a.amountPaid || 0), 0);
 
-    return { total, pending, processing, completed, rejected, paid, revenue };
+    return { total, pending, processing, completed, rejected, docsRequested, paid, revenue };
   }),
 
   listApplications: publicQuery
@@ -62,7 +63,8 @@ export const adminRouter = createRouter({
             r.fullName.toLowerCase().includes(s) ||
             r.phone.includes(s) ||
             r.email?.toLowerCase().includes(s) ||
-            r.id.toString().includes(s)
+            r.trackingCode?.toLowerCase().includes(s) ||
+            String(r.id).includes(s)
         );
       }
 
@@ -108,14 +110,20 @@ export const adminRouter = createRouter({
         .where(eq(applications.id, input.id));
 
       // Send email notification if requested and email exists
+      // WRAPPED IN TRY/CATCH so email failures don't crash the mutation
       if (input.notifyCustomer && app?.email && app.email.length > 0) {
-        await sendStatusUpdate({
-          to: app.email,
-          fullName: app.fullName,
-          appId: app.id,
-          visaType: app.visaType,
-          status: input.status,
-        });
+        try {
+          await sendStatusUpdate({
+            to: app.email,
+            fullName: app.fullName,
+            trackingCode: app.trackingCode || String(app.id),
+            visaType: app.visaType,
+            status: input.status,
+          });
+        } catch (err) {
+          console.error("[Admin] Email notification failed:", err);
+          // Continue - status was updated even if email failed
+        }
       }
 
       return { success: true };
@@ -144,7 +152,7 @@ export const adminRouter = createRouter({
 
       // Build CSV
       const headers = [
-        "ID", "Full Name", "Nationality", "Phone", "Email",
+        "ID", "Tracking Code", "Full Name", "Nationality", "Phone", "Email",
         "Visa Type", "Payment Method", "Payment Status", "Status",
         "Amount Paid (AED)", "Passport URL", "Photo URL", "Bank Statement URL",
         "Notes", "Created At", "Updated At",
@@ -154,6 +162,7 @@ export const adminRouter = createRouter({
 
       const csvRows = filtered.map((r) => [
         r.id,
+        r.trackingCode || "",
         `"${q(r.fullName)}"`,
         `"${q(r.nationality)}"`,
         `"${r.phone || ""}"`,
