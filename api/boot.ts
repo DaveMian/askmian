@@ -11,6 +11,7 @@ import path from "path";
 const app = new Hono<{ Bindings: HttpBindings }>();
 
 // CORS - custom middleware (works with esbuild bundling)
+// Must set headers on EVERY response, including tRPC responses
 app.use("*", async (c, next) => {
   const origin = c.req.header("Origin") || "*";
   c.header("Access-Control-Allow-Origin", origin);
@@ -22,7 +23,33 @@ app.use("*", async (c, next) => {
     return c.text("", 204);
   }
 
-  return next();
+  await next();
+
+  // Ensure CORS headers are on the final response too
+  c.header("Access-Control-Allow-Origin", origin);
+  c.header("Access-Control-Allow-Credentials", "true");
+});
+
+// Health check endpoint
+app.get("/api/health", async (c) => {
+  try {
+    // Try to import getDb to test connection
+    const { getDb } = await import("./queries/connection");
+    const db = getDb();
+    // Try a simple query
+    const result = await db.query.applications?.findFirst() ?? "db_ready";
+    return c.json({
+      status: "ok",
+      db: "connected",
+      env: {
+        hasDatabaseUrl: !!env.databaseUrl,
+        hasAdminPassword: !!env.adminPassword,
+      },
+    });
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    return c.json({ status: "error", db: "disconnected", error }, 500);
+  }
 });
 
 // Ensure uploads directory exists
@@ -91,13 +118,26 @@ app.use("/uploads/*", async (c) => {
   return c.notFound();
 });
 
-// tRPC endpoint
+// tRPC endpoint - wrap response to preserve CORS headers
 app.use("/api/trpc/*", async (c) => {
-  return fetchRequestHandler({
+  const response = await fetchRequestHandler({
     endpoint: "/api/trpc",
     req: c.req.raw,
     router: appRouter,
     createContext,
+  });
+
+  // tRPC's fetchRequestHandler returns a Response without CORS headers.
+  // We must create a new response that includes them.
+  const origin = c.req.header("Origin") || "*";
+  const newHeaders = new Headers(response.headers);
+  newHeaders.set("Access-Control-Allow-Origin", origin);
+  newHeaders.set("Access-Control-Allow-Credentials", "true");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: newHeaders,
   });
 });
 
@@ -111,5 +151,6 @@ if (env.isProduction) {
   const port = parseInt(process.env.PORT || "3000");
   serve({ fetch: app.fetch, port }, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    console.log(`Database URL configured: ${env.databaseUrl ? "YES" : "NO"}`);
   });
 }
