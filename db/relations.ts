@@ -1,1 +1,1 @@
-import { relations } from "
+import { relations } from "drizzle-orm";

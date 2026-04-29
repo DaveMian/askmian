@@ -151,12 +151,11 @@ export const adminRouter = createRouter({
       ];
 
       const csvRows = filtered.map((r) => [
-        r.id,
-        `"${(r.fullName || "").replace(/"/g, """)}"`,
-        `"${(r.nationality || "").replace(/"/g, """)}"`,
+        `"${(r.fullName || "").replace(/"/g, '""')}"`,
+        `"${(r.nationality || "").replace(/"/g, '""')}"`,
         `"${r.phone || ""}"`,
-        `"${(r.email || "").replace(/"/g, """)}"`,
-        `"${(r.visaType || "").replace(/"/g, """)}"`,
+        `"${(r.email || "").replace(/"/g, '""')}"`,
+        `"${(r.visaType || "").replace(/"/g, '""')}"`,
         r.paymentMethod || "",
         r.paymentStatus || "",
         r.status || "",
@@ -164,7 +163,7 @@ export const adminRouter = createRouter({
         r.passportUrl || "",
         r.photoUrl || "",
         r.bankStatementUrl || "",
-        `"${(r.notes || "").replace(/"/g, """)}"`,
+        `"${(r.notes || "").replace(/"/g, '""')}"`,
         r.createdAt ? new Date(r.createdAt).toISOString() : "",
         r.updatedAt ? new Date(r.updatedAt).toISOString() : "",
       ]);
