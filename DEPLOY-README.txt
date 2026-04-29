@@ -1,14 +1,10 @@
-ASK MIAN BACKEND — FIXED
-========================
+ASK MIAN BACKEND — DEPLOY INSTRUCTIONS
+========================================
 
-DEPLOY STEPS:
-1. Push these files to GitHub repo: askmian-backend
-2. Railway → New Project → Deploy from GitHub
-3. Add environment variables (see .env.example)
-4. Deploy
+1. Push these files to a GitHub repo named "askmian-backend"
+2. Go to railway.app → New Project → Deploy from GitHub
+3. Select "askmian-backend"
+4. Add environment variables (see .env.example)
+5. Click Deploy
 
-HEALTH CHECK FIXED:
-- /health endpoint now imports from correct path (api/queries/connection)
-- Tests database connection properly
-
-NO DOCKERFILE — uses Railway Nixpacks
+NO DOCKERFILE NEEDED — Railway auto-detects Node.js
