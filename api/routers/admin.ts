@@ -150,21 +150,23 @@ export const adminRouter = createRouter({
         "Notes", "Created At", "Updated At",
       ];
 
+      const q = (s: string) => (s || "").replace(/"/g, '""');
+
       const csvRows = filtered.map((r) => [
         r.id,
-        `"${(r.fullName || "").replace(/"/g, """)}"`,
-        `"${(r.nationality || "").replace(/"/g, """)}"`,
+        `"${q(r.fullName)}"`,
+        `"${q(r.nationality)}"`,
         `"${r.phone || ""}"`,
-        `"${(r.email || "").replace(/"/g, """)}"`,
-        `"${(r.visaType || "").replace(/"/g, """)}"`,
+        `"${q(r.email)}"`,
+        `"${q(r.visaType)}"`,
         r.paymentMethod || "",
         r.paymentStatus || "",
         r.status || "",
-        (r.amountPaid || 0) / 100, // Convert fils to AED
+        (r.amountPaid || 0) / 100,
         r.passportUrl || "",
         r.photoUrl || "",
         r.bankStatementUrl || "",
-        `"${(r.notes || "").replace(/"/g, """)}"`,
+        `"${q(r.notes)}"`,
         r.createdAt ? new Date(r.createdAt).toISOString() : "",
         r.updatedAt ? new Date(r.updatedAt).toISOString() : "",
       ]);
