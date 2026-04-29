@@ -14,7 +14,7 @@ export const env = {
   isProduction: process.env.NODE_ENV === "production",
   databaseUrl: required("DATABASE_URL"),
   adminPassword: process.env.ADMIN_PASSWORD || "admin123", // Set strong password in production
-  backendUrl: process.env.BACKEND_URL || "",
+  backendUrl: process.env.BACKEND_URL || "https://askmian-production-792b.up.railway.app",
   // RAKBANK Details
   bankName: process.env.BANK_NAME || "RAKBANK",
   bankAccountName: process.env.BANK_ACCOUNT_NAME || "ASK MIAN LLC",
