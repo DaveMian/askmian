@@ -2,9 +2,7 @@ import { z } from "zod";
 import { createRouter, publicQuery } from "../middleware";
 import { getDb } from "../queries/connection";
 import { applications } from "@db/schema";
-import { eq, sql } from "drizzle-orm";
-import { sendApplicationConfirmation, sendAdminNotification } from "../lib/email";
-import { generateTrackingCode } from "../lib/tracking";
+import { eq } from "drizzle-orm";
 
 export const applicationRouter = createRouter({
   create: publicQuery
@@ -22,17 +20,11 @@ export const applicationRouter = createRouter({
         passportUrl: z.string().optional(),
         photoUrl: z.string().optional(),
         bankStatementUrl: z.string().optional(),
-        stripePaymentIntentId: z.string().optional(),
-        stripeClientSecret: z.string().optional(),
-        paymentStatus: z.string().optional(),
-        amountPaid: z.number().optional(),
       })
     )
     .mutation(async ({ input }) => {
       const db = getDb();
-
-      // Build insert data
-      const insertData: Record<string, unknown> = {
+      const result = await db.insert(applications).values({
         fullName: input.fullName,
         nationality: input.nationality,
         currentLocation: input.currentLocation || null,
@@ -45,136 +37,10 @@ export const applicationRouter = createRouter({
         passportUrl: input.passportUrl || null,
         photoUrl: input.photoUrl || null,
         bankStatementUrl: input.bankStatementUrl || null,
-        stripePaymentIntentId: input.stripePaymentIntentId || null,
-        stripeClientSecret: input.stripeClientSecret || null,
-        paymentStatus: input.paymentStatus || "pending",
-        amountPaid: input.amountPaid || null,
         status: "pending",
-      };
-
-      // Try to add tracking code. If column doesn't exist yet, this will fail
-      // and we'll retry without it.
-      let trackingCode: string | undefined;
-      let result;
-
-      try {
-        trackingCode = generateTrackingCode();
-        result = await db.insert(applications).values({
-          ...insertData,
-          trackingCode,
-        });
-      } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        // If tracking_code column is missing, retry without it
-        if (errMsg.includes("tracking_code") || errMsg.includes("Unknown column")) {
-          console.log("[Application] tracking_code column not ready, inserting without it");
-          result = await db.insert(applications).values(insertData);
-        } else {
-          throw err;
-        }
-      }
-
-      const appId = Number(result[0].insertId);
-
-      // Send confirmation email to customer
-      if (input.email && input.email.length > 0) {
-        await sendApplicationConfirmation({
-          to: input.email,
-          appId,
-          trackingCode: trackingCode || String(appId),
-          fullName: input.fullName,
-          visaType: input.visaType,
-          paymentMethod: input.paymentMethod || "",
-        });
-      }
-
-      // Send admin notification
-      await sendAdminNotification({
-        appId,
-        trackingCode: trackingCode || String(appId),
-        fullName: input.fullName,
-        visaType: input.visaType,
-        phone: input.phone,
-        email: input.email,
-        paymentMethod: input.paymentMethod || "",
+        paymentStatus: "pending",
       });
-
-      return { id: appId, trackingCode: trackingCode || String(appId) };
-    }),
-
-  // Public status tracking - search by tracking code
-  track: publicQuery
-    .input(z.object({ trackingCode: z.string() }))
-    .query(async ({ input }) => {
-      const db = getDb();
-      const rows = await db
-        .select()
-        .from(applications)
-        .where(eq(applications.trackingCode, input.trackingCode.toUpperCase().trim()));
-      const app = rows[0];
-      if (!app) return null;
-      // Return only safe fields for public view
-      return {
-        id: app.id,
-        trackingCode: app.trackingCode,
-        fullName: app.fullName,
-        visaType: app.visaType,
-        status: app.status,
-        paymentStatus: app.paymentStatus,
-        paymentMethod: app.paymentMethod,
-        createdAt: app.createdAt,
-        updatedAt: app.updatedAt,
-      };
-    }),
-
-  update: publicQuery
-    .input(
-      z.object({
-        id: z.number(),
-        fullName: z.string().optional(),
-        nationality: z.string().optional(),
-        currentLocation: z.string().optional(),
-        phone: z.string().optional(),
-        email: z.string().email().optional().or(z.literal("")),
-        visaType: z.string().optional(),
-        travelDate: z.string().optional(),
-        notes: z.string().optional(),
-        paymentMethod: z.string().optional(),
-        passportUrl: z.string().optional(),
-        photoUrl: z.string().optional(),
-        bankStatementUrl: z.string().optional(),
-        stripePaymentIntentId: z.string().optional(),
-        stripeClientSecret: z.string().optional(),
-        paymentStatus: z.string().optional(),
-        amountPaid: z.number().optional(),
-        status: z.string().optional(),
-      })
-    )
-    .mutation(async ({ input }) => {
-      const db = getDb();
-      const { id, ...data } = input;
-      const updateData: Record<string, unknown> = {};
-      if (data.fullName) updateData.fullName = data.fullName;
-      if (data.nationality) updateData.nationality = data.nationality;
-      if (data.currentLocation !== undefined) updateData.currentLocation = data.currentLocation || null;
-      if (data.phone) updateData.phone = data.phone;
-      if (data.email !== undefined) updateData.email = data.email || null;
-      if (data.visaType) updateData.visaType = data.visaType;
-      if (data.travelDate !== undefined) updateData.travelDate = data.travelDate || null;
-      if (data.notes !== undefined) updateData.notes = data.notes || null;
-      if (data.paymentMethod) updateData.paymentMethod = data.paymentMethod;
-      if (data.passportUrl) updateData.passportUrl = data.passportUrl;
-      if (data.photoUrl) updateData.photoUrl = data.photoUrl;
-      if (data.bankStatementUrl) updateData.bankStatementUrl = data.bankStatementUrl;
-      if (data.stripePaymentIntentId) updateData.stripePaymentIntentId = data.stripePaymentIntentId;
-      if (data.stripeClientSecret) updateData.stripeClientSecret = data.stripeClientSecret;
-      if (data.paymentStatus) updateData.paymentStatus = data.paymentStatus;
-      if (data.amountPaid !== undefined) updateData.amountPaid = data.amountPaid;
-      if (data.status) updateData.status = data.status;
-      updateData.updatedAt = new Date();
-
-      await db.update(applications).set(updateData).where(eq(applications.id, id));
-      return { success: true };
+      return { id: Number(result[0].insertId) };
     }),
 
   get: publicQuery

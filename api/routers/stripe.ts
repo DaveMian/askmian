@@ -17,7 +17,7 @@ export const stripeRouter = createRouter({
   createPaymentIntent: publicQuery
     .input(
       z.object({
-        applicationId: z.number().optional(),
+        applicationId: z.number(),
         visaType: z.string(),
       })
     )
@@ -36,7 +36,7 @@ export const stripeRouter = createRouter({
         currency: "aed",
         automatic_payment_methods: { enabled: true },
         metadata: {
-          applicationId: String(input.applicationId || ""),
+          applicationId: String(input.applicationId),
           visaType: input.visaType,
         },
       });

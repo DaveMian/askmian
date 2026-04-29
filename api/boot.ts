@@ -5,14 +5,12 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
-import { sql } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
-// CORS - custom middleware (works with esbuild bundling)
-// Must set headers on EVERY response, including tRPC responses
+// CORS — custom middleware (avoids bundler issues with hono/cors)
 app.use("*", async (c, next) => {
   const origin = c.req.header("Origin") || "*";
   c.header("Access-Control-Allow-Origin", origin);
@@ -24,32 +22,7 @@ app.use("*", async (c, next) => {
     return c.text("", 204);
   }
 
-  await next();
-
-  // Ensure CORS headers are on the final response too
-  c.header("Access-Control-Allow-Origin", origin);
-  c.header("Access-Control-Allow-Credentials", "true");
-});
-
-// Health check endpoint
-app.get("/api/health", async (c) => {
-  try {
-    const { getDb } = await import("./queries/connection");
-    const db = getDb();
-    // Simple connection test - don't query applications if schema might mismatch
-    await db.execute(sql`SELECT 1 as test`);
-    return c.json({
-      status: "ok",
-      db: "connected",
-      env: {
-        hasDatabaseUrl: !!env.databaseUrl,
-        hasAdminPassword: !!env.adminPassword,
-      },
-    });
-  } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
-    return c.json({ status: "error", db: "disconnected", error }, 500);
-  }
+  return next();
 });
 
 // Ensure uploads directory exists
@@ -63,13 +36,14 @@ app.post("/api/upload", bodyLimit({ maxSize: 20 * 1024 * 1024 }), async (c) => {
   try {
     const formData = await c.req.formData();
     const file = formData.get("file") as File | null;
-    const field = (formData.get("field") as string) || "document";
-    const appId = (formData.get("applicationId") as string) || "unknown";
+    const field = formData.get("field") as string || "document";
+    const appId = formData.get("applicationId") as string || "unknown";
 
     if (!file) {
       return c.json({ error: "No file provided" }, 400);
     }
 
+    // Create app-specific directory
     const appDir = path.join(uploadsDir, appId);
     if (!fs.existsSync(appDir)) {
       fs.mkdirSync(appDir, { recursive: true });
@@ -79,12 +53,13 @@ app.post("/api/upload", bodyLimit({ maxSize: 20 * 1024 * 1024 }), async (c) => {
     const fileName = `${field}_${Date.now()}${ext}`;
     const filePath = path.join(appDir, fileName);
 
+    // Save file
     const buffer = Buffer.from(await file.arrayBuffer());
     fs.writeFileSync(filePath, buffer);
 
-    // Return FULL URL so frontend/admin can access files from Cloudflare Pages
-    const origin = new URL(c.req.url).origin;
-    const fileUrl = `${origin}/uploads/${appId}/${fileName}`;
+    // Return URL (absolute for cross-origin frontend hosting)
+    const baseUrl = process.env.BACKEND_URL || '';
+    const fileUrl = baseUrl ? `${baseUrl}/uploads/${appId}/${fileName}` : `/uploads/${appId}/${fileName}`;
 
     return c.json({
       success: true,
@@ -98,16 +73,8 @@ app.post("/api/upload", bodyLimit({ maxSize: 20 * 1024 * 1024 }), async (c) => {
   }
 });
 
-// Serve uploaded files statically with CORS
+// Serve uploaded files statically
 app.use("/uploads/*", async (c) => {
-  const origin = c.req.header("Origin") || "*";
-  c.header("Access-Control-Allow-Origin", origin);
-  c.header("Access-Control-Allow-Credentials", "true");
-
-  if (c.req.method === "OPTIONS") {
-    return c.text("", 204);
-  }
-
   const filePath = path.join(uploadsDir, c.req.path.replace("/uploads/", ""));
   if (fs.existsSync(filePath)) {
     const ext = path.extname(filePath).toLowerCase();
@@ -125,24 +92,13 @@ app.use("/uploads/*", async (c) => {
   return c.notFound();
 });
 
-// tRPC endpoint - wrap response to preserve CORS headers
+// tRPC endpoint
 app.use("/api/trpc/*", async (c) => {
-  const response = await fetchRequestHandler({
+  return fetchRequestHandler({
     endpoint: "/api/trpc",
     req: c.req.raw,
     router: appRouter,
     createContext,
-  });
-
-  const origin = c.req.header("Origin") || "*";
-  const newHeaders = new Headers(response.headers);
-  newHeaders.set("Access-Control-Allow-Origin", origin);
-  newHeaders.set("Access-Control-Allow-Credentials", "true");
-
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: newHeaders,
   });
 });
 
@@ -156,6 +112,5 @@ if (env.isProduction) {
   const port = parseInt(process.env.PORT || "3000");
   serve({ fetch: app.fetch, port }, () => {
     console.log(`Server running on http://localhost:${port}/`);
-    console.log(`Database URL configured: ${env.databaseUrl ? "YES" : "NO"}`);
   });
 }
