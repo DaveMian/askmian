@@ -83,11 +83,17 @@ export const adminRouter = createRouter({
 
       if (!app) return null;
 
-      const notes = await db
-        .select()
-        .from(applicationNotes)
-        .where(eq(applicationNotes.applicationId, input.id))
-        .orderBy(desc(applicationNotes.createdAt));
+      // Try to fetch notes — if table doesn't exist yet, return empty
+      let notes: any[] = [];
+      try {
+        notes = await db
+          .select()
+          .from(applicationNotes)
+          .where(eq(applicationNotes.applicationId, input.id))
+          .orderBy(desc(applicationNotes.createdAt));
+      } catch (err) {
+        console.log("[Admin] Notes table not ready yet:", err instanceof Error ? err.message : String(err));
+      }
 
       return { ...app, notes };
     }),
