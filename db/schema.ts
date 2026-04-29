@@ -10,7 +10,7 @@ import {
 // Visa applications submitted through the website
 export const applications = mysqlTable("applications", {
   id: serial("id").primaryKey(),
-  trackingCode: varchar("tracking_code", { length: 20 }).notNull().unique(),
+  trackingCode: varchar("tracking_code", { length: 20 }),
   fullName: varchar("full_name", { length: 255 }).notNull(),
   nationality: varchar("nationality", { length: 255 }).notNull(),
   currentLocation: varchar("current_location", { length: 255 }),

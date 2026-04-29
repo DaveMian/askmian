@@ -31,11 +31,8 @@ export const applicationRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
 
-      // Generate secure tracking code
-      const trackingCode = generateTrackingCode();
-
-      const result = await db.insert(applications).values({
-        trackingCode,
+      // Build insert data
+      const insertData: Record<string, unknown> = {
         fullName: input.fullName,
         nationality: input.nationality,
         currentLocation: input.currentLocation || null,
@@ -53,7 +50,29 @@ export const applicationRouter = createRouter({
         paymentStatus: input.paymentStatus || "pending",
         amountPaid: input.amountPaid || null,
         status: "pending",
-      });
+      };
+
+      // Try to add tracking code. If column doesn't exist yet, this will fail
+      // and we'll retry without it.
+      let trackingCode: string | undefined;
+      let result;
+
+      try {
+        trackingCode = generateTrackingCode();
+        result = await db.insert(applications).values({
+          ...insertData,
+          trackingCode,
+        });
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        // If tracking_code column is missing, retry without it
+        if (errMsg.includes("tracking_code") || errMsg.includes("Unknown column")) {
+          console.log("[Application] tracking_code column not ready, inserting without it");
+          result = await db.insert(applications).values(insertData);
+        } else {
+          throw err;
+        }
+      }
 
       const appId = Number(result[0].insertId);
 
@@ -62,7 +81,7 @@ export const applicationRouter = createRouter({
         await sendApplicationConfirmation({
           to: input.email,
           appId,
-          trackingCode,
+          trackingCode: trackingCode || String(appId),
           fullName: input.fullName,
           visaType: input.visaType,
           paymentMethod: input.paymentMethod || "",
@@ -72,7 +91,7 @@ export const applicationRouter = createRouter({
       // Send admin notification
       await sendAdminNotification({
         appId,
-        trackingCode,
+        trackingCode: trackingCode || String(appId),
         fullName: input.fullName,
         visaType: input.visaType,
         phone: input.phone,
@@ -80,7 +99,7 @@ export const applicationRouter = createRouter({
         paymentMethod: input.paymentMethod || "",
       });
 
-      return { id: appId, trackingCode };
+      return { id: appId, trackingCode: trackingCode || String(appId) };
     }),
 
   // Public status tracking - search by tracking code

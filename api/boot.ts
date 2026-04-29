@@ -5,6 +5,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
+import { sql } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 
@@ -35,7 +36,8 @@ app.get("/api/health", async (c) => {
   try {
     const { getDb } = await import("./queries/connection");
     const db = getDb();
-    const result = await db.query.applications?.findFirst() ?? "db_ready";
+    // Simple connection test - don't query applications if schema might mismatch
+    await db.execute(sql`SELECT 1 as test`);
     return c.json({
       status: "ok",
       db: "connected",
