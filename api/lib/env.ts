@@ -14,4 +14,11 @@ export const env = {
   isProduction: process.env.NODE_ENV === "production",
   databaseUrl: required("DATABASE_URL"),
   adminPassword: process.env.ADMIN_PASSWORD || "admin123", // Set strong password in production
+  backendUrl: process.env.BACKEND_URL || "",
+  // RAKBANK Details
+  bankName: process.env.BANK_NAME || "RAKBANK",
+  bankAccountName: process.env.BANK_ACCOUNT_NAME || "ASK MIAN LLC",
+  bankAccountNumber: process.env.BANK_ACCOUNT_NUMBER || "0303698014001",
+  bankIban: process.env.BANK_IBAN || "AE77 0400 0003 0369 8014 001",
+  bankSwift: process.env.BANK_SWIFT || "NRAKAEAK",
 };
