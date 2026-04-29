@@ -118,11 +118,25 @@ app.get("/health", async (c) => {
 
 // tRPC endpoint
 app.use("/api/trpc/*", async (c) => {
-  return fetchRequestHandler({
+  const response = await fetchRequestHandler({
     endpoint: "/api/trpc",
     req: c.req.raw,
     router: appRouter,
     createContext,
+  });
+
+  // tRPC creates its own Response — we must copy CORS headers onto it
+  const origin = c.req.header("Origin") || "*";
+  const newHeaders = new Headers(response.headers);
+  newHeaders.set("Access-Control-Allow-Origin", origin);
+  newHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  newHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-admin-token");
+  newHeaders.set("Access-Control-Allow-Credentials", "true");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: newHeaders,
   });
 });
 
