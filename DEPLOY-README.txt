@@ -1,10 +1,10 @@
-ASK MIAN BACKEND — DEPLOY INSTRUCTIONS
-========================================
+ASK MIAN BACKEND — FIXED BUILD
+==============================
 
-1. Push these files to a GitHub repo named "askmian-backend"
-2. Go to railway.app → New Project → Deploy from GitHub
-3. Select "askmian-backend"
-4. Add environment variables (see .env.example)
-5. Click Deploy
+This backend uses a build script (scripts/build.cjs) that fixes
+the esbuild quote escaping issue that caused the "module" crash.
 
-NO DOCKERFILE NEEDED — Railway auto-detects Node.js
+1. Push these files to GitHub repo: askmian-backend
+2. Railway → New Project → Deploy from GitHub
+3. Add environment variables (see .env.example)
+4. Deploy
