@@ -1,1 +1,1 @@
-import {} from "./schema";
+import { relations } from "

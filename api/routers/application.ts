@@ -3,6 +3,7 @@ import { createRouter, publicQuery } from "../middleware";
 import { getDb } from "../queries/connection";
 import { applications } from "@db/schema";
 import { eq } from "drizzle-orm";
+import { sendApplicationConfirmation, sendAdminNotification } from "../lib/email";
 
 export const applicationRouter = createRouter({
   create: publicQuery
@@ -47,7 +48,55 @@ export const applicationRouter = createRouter({
         amountPaid: input.amountPaid || null,
         status: "pending",
       });
-      return { id: Number(result[0].insertId) };
+
+      const appId = Number(result[0].insertId);
+
+      // Send confirmation email to customer
+      if (input.email && input.email.length > 0) {
+        await sendApplicationConfirmation({
+          to: input.email,
+          appId,
+          fullName: input.fullName,
+          visaType: input.visaType,
+          paymentMethod: input.paymentMethod || "",
+        });
+      }
+
+      // Send admin notification
+      await sendAdminNotification({
+        appId,
+        fullName: input.fullName,
+        visaType: input.visaType,
+        phone: input.phone,
+        email: input.email,
+        paymentMethod: input.paymentMethod || "",
+      });
+
+      return { id: appId };
+    }),
+
+  // Public status tracking - no auth needed
+  track: publicQuery
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(applications)
+        .where(eq(applications.id, input.id));
+      const app = rows[0];
+      if (!app) return null;
+      // Return only safe fields for public view
+      return {
+        id: app.id,
+        fullName: app.fullName,
+        visaType: app.visaType,
+        status: app.status,
+        paymentStatus: app.paymentStatus,
+        paymentMethod: app.paymentMethod,
+        createdAt: app.createdAt,
+        updatedAt: app.updatedAt,
+      };
     }),
 
   update: publicQuery
