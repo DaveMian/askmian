@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "esbuild api/boot.ts --platform=node --bundle --format=esm --outdir=dist --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\"",
+    "prestart": "npx drizzle-kit push",
     "start": "NODE_ENV=production node dist/boot.js",
     "dev": "tsx api/boot.ts",
     "db:push": "drizzle-kit push",
