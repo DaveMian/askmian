@@ -33,10 +33,8 @@ app.use("*", async (c, next) => {
 // Health check endpoint
 app.get("/api/health", async (c) => {
   try {
-    // Try to import getDb to test connection
     const { getDb } = await import("./queries/connection");
     const db = getDb();
-    // Try a simple query
     const result = await db.query.applications?.findFirst() ?? "db_ready";
     return c.json({
       status: "ok",
@@ -70,7 +68,6 @@ app.post("/api/upload", bodyLimit({ maxSize: 20 * 1024 * 1024 }), async (c) => {
       return c.json({ error: "No file provided" }, 400);
     }
 
-    // Create app-specific directory
     const appDir = path.join(uploadsDir, appId);
     if (!fs.existsSync(appDir)) {
       fs.mkdirSync(appDir, { recursive: true });
@@ -80,12 +77,12 @@ app.post("/api/upload", bodyLimit({ maxSize: 20 * 1024 * 1024 }), async (c) => {
     const fileName = `${field}_${Date.now()}${ext}`;
     const filePath = path.join(appDir, fileName);
 
-    // Save file
     const buffer = Buffer.from(await file.arrayBuffer());
     fs.writeFileSync(filePath, buffer);
 
-    // Return URL (served from /uploads/)
-    const fileUrl = `/uploads/${appId}/${fileName}`;
+    // Return FULL URL so frontend/admin can access files from Cloudflare Pages
+    const origin = new URL(c.req.url).origin;
+    const fileUrl = `${origin}/uploads/${appId}/${fileName}`;
 
     return c.json({
       success: true,
@@ -99,8 +96,16 @@ app.post("/api/upload", bodyLimit({ maxSize: 20 * 1024 * 1024 }), async (c) => {
   }
 });
 
-// Serve uploaded files statically
+// Serve uploaded files statically with CORS
 app.use("/uploads/*", async (c) => {
+  const origin = c.req.header("Origin") || "*";
+  c.header("Access-Control-Allow-Origin", origin);
+  c.header("Access-Control-Allow-Credentials", "true");
+
+  if (c.req.method === "OPTIONS") {
+    return c.text("", 204);
+  }
+
   const filePath = path.join(uploadsDir, c.req.path.replace("/uploads/", ""));
   if (fs.existsSync(filePath)) {
     const ext = path.extname(filePath).toLowerCase();
@@ -127,8 +132,6 @@ app.use("/api/trpc/*", async (c) => {
     createContext,
   });
 
-  // tRPC's fetchRequestHandler returns a Response without CORS headers.
-  // We must create a new response that includes them.
   const origin = c.req.header("Origin") || "*";
   const newHeaders = new Headers(response.headers);
   newHeaders.set("Access-Control-Allow-Origin", origin);

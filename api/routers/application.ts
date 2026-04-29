@@ -20,6 +20,10 @@ export const applicationRouter = createRouter({
         passportUrl: z.string().optional(),
         photoUrl: z.string().optional(),
         bankStatementUrl: z.string().optional(),
+        stripePaymentIntentId: z.string().optional(),
+        stripeClientSecret: z.string().optional(),
+        paymentStatus: z.string().optional(),
+        amountPaid: z.number().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -37,10 +41,63 @@ export const applicationRouter = createRouter({
         passportUrl: input.passportUrl || null,
         photoUrl: input.photoUrl || null,
         bankStatementUrl: input.bankStatementUrl || null,
+        stripePaymentIntentId: input.stripePaymentIntentId || null,
+        stripeClientSecret: input.stripeClientSecret || null,
+        paymentStatus: input.paymentStatus || "pending",
+        amountPaid: input.amountPaid || null,
         status: "pending",
-        paymentStatus: "pending",
       });
       return { id: Number(result[0].insertId) };
+    }),
+
+  update: publicQuery
+    .input(
+      z.object({
+        id: z.number(),
+        fullName: z.string().optional(),
+        nationality: z.string().optional(),
+        currentLocation: z.string().optional(),
+        phone: z.string().optional(),
+        email: z.string().email().optional().or(z.literal("")),
+        visaType: z.string().optional(),
+        travelDate: z.string().optional(),
+        notes: z.string().optional(),
+        paymentMethod: z.string().optional(),
+        passportUrl: z.string().optional(),
+        photoUrl: z.string().optional(),
+        bankStatementUrl: z.string().optional(),
+        stripePaymentIntentId: z.string().optional(),
+        stripeClientSecret: z.string().optional(),
+        paymentStatus: z.string().optional(),
+        amountPaid: z.number().optional(),
+        status: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const { id, ...data } = input;
+      const updateData: Record<string, unknown> = {};
+      if (data.fullName) updateData.fullName = data.fullName;
+      if (data.nationality) updateData.nationality = data.nationality;
+      if (data.currentLocation !== undefined) updateData.currentLocation = data.currentLocation || null;
+      if (data.phone) updateData.phone = data.phone;
+      if (data.email !== undefined) updateData.email = data.email || null;
+      if (data.visaType) updateData.visaType = data.visaType;
+      if (data.travelDate !== undefined) updateData.travelDate = data.travelDate || null;
+      if (data.notes !== undefined) updateData.notes = data.notes || null;
+      if (data.paymentMethod) updateData.paymentMethod = data.paymentMethod;
+      if (data.passportUrl) updateData.passportUrl = data.passportUrl;
+      if (data.photoUrl) updateData.photoUrl = data.photoUrl;
+      if (data.bankStatementUrl) updateData.bankStatementUrl = data.bankStatementUrl;
+      if (data.stripePaymentIntentId) updateData.stripePaymentIntentId = data.stripePaymentIntentId;
+      if (data.stripeClientSecret) updateData.stripeClientSecret = data.stripeClientSecret;
+      if (data.paymentStatus) updateData.paymentStatus = data.paymentStatus;
+      if (data.amountPaid !== undefined) updateData.amountPaid = data.amountPaid;
+      if (data.status) updateData.status = data.status;
+      updateData.updatedAt = new Date();
+
+      await db.update(applications).set(updateData).where(eq(applications.id, id));
+      return { success: true };
     }),
 
   get: publicQuery
