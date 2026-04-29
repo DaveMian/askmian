@@ -18,5 +18,3 @@ COPY package.json ./
 
 EXPOSE 3000
 CMD ["npm", "start"]
- string) => appError(500, msg),
-} a
