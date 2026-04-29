@@ -7,6 +7,7 @@ import { createContext } from "./context";
 import { env } from "./lib/env";
 import fs from "fs";
 import path from "path";
+import { sql } from "drizzle-orm";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -90,6 +91,29 @@ app.use("/uploads/*", async (c) => {
     return c.body(fs.readFileSync(filePath));
   }
   return c.notFound();
+});
+
+// Health check + connectivity test
+app.get("/health", async (c) => {
+  try {
+    // Test database connection
+    const { db } = await import("./db/client");
+    const result = await db.execute(sql`SELECT 1 as test`);
+    
+    return c.json({
+      status: "ok",
+      time: new Date().toISOString(),
+      db: "connected",
+      env: env.isProduction ? "production" : "development",
+      uploadDir: fs.existsSync(uploadsDir) ? "ready" : "missing",
+    });
+  } catch (err: any) {
+    return c.json({
+      status: "error",
+      db: "disconnected",
+      error: err.message,
+    }, 500);
+  }
 });
 
 // tRPC endpoint
