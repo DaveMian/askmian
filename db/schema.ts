@@ -10,6 +10,7 @@ import {
 // Visa applications submitted through the website
 export const applications = mysqlTable("applications", {
   id: serial("id").primaryKey(),
+  trackingCode: varchar("tracking_code", { length: 20 }).unique(),
   fullName: varchar("full_name", { length: 255 }).notNull(),
   nationality: varchar("nationality", { length: 255 }).notNull(),
   currentLocation: varchar("current_location", { length: 255 }),
@@ -20,6 +21,7 @@ export const applications = mysqlTable("applications", {
   notes: text("notes"),
   paymentMethod: varchar("payment_method", { length: 100 }),
   paymentStatus: varchar("payment_status", { length: 50 }).notNull().default("pending"),
+  paymentProofUrl: varchar("payment_proof_url", { length: 500 }),
   stripePaymentIntentId: varchar("stripe_pi_id", { length: 255 }),
   stripeClientSecret: varchar("stripe_client_secret", { length: 255 }),
   status: varchar("status", { length: 50 }).notNull().default("pending"),

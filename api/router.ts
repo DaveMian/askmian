@@ -3,6 +3,7 @@ import { applicationRouter } from "./routers/application";
 import { stripeRouter } from "./routers/stripe";
 import { adminRouter } from "./routers/admin";
 import { adminAuthRouter } from "./routers/adminAuth";
+import { emailRouter } from "./routers/email";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -11,6 +12,7 @@ export const appRouter = createRouter({
   stripe: stripeRouter,
   admin: adminRouter,
   adminAuth: adminAuthRouter,
+  email: emailRouter,
 });
 
 export type AppRouter = typeof appRouter;
