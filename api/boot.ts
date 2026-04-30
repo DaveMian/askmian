@@ -92,65 +92,6 @@ app.use("/uploads/*", async (c) => {
   return c.notFound();
 });
 
-// Database migration endpoint — adds columns that exist in the schema but may be missing from the live DB
-app.post("/api/migrate", async (c) => {
-  try {
-    const mysql = await import("mysql2/promise");
-
-    // Parse DATABASE_URL (mysql://user:pass@host:port/dbname)
-    const url = new URL(env.databaseUrl);
-    const connection = await mysql.createConnection({
-      host: url.hostname,
-      port: url.port ? parseInt(url.port) : 3306,
-      user: url.username,
-      password: url.password,
-      database: url.pathname.replace(/^\//, ""),
-      ssl: { rejectUnauthorized: false },
-    });
-
-    const dbName = url.pathname.replace(/^\//, "");
-    const results: { column: string; action: string }[] = [];
-
-    // Helper: check if a column exists in INFORMATION_SCHEMA
-    async function columnExists(table: string, column: string): Promise<boolean> {
-      const [rows] = await connection.execute(
-        `SELECT COUNT(*) AS cnt
-         FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-        [dbName, table, column]
-      );
-      return (rows as any)[0].cnt > 0;
-    }
-
-    // 1. tracking_code VARCHAR(20) UNIQUE AFTER id
-    if (await columnExists("applications", "tracking_code")) {
-      results.push({ column: "tracking_code", action: "already exists — skipped" });
-    } else {
-      await connection.execute(
-        "ALTER TABLE applications ADD COLUMN tracking_code VARCHAR(20) UNIQUE AFTER id"
-      );
-      results.push({ column: "tracking_code", action: "added" });
-    }
-
-    // 2. payment_proof_url VARCHAR(500) AFTER payment_status
-    if (await columnExists("applications", "payment_proof_url")) {
-      results.push({ column: "payment_proof_url", action: "already exists — skipped" });
-    } else {
-      await connection.execute(
-        "ALTER TABLE applications ADD COLUMN payment_proof_url VARCHAR(500) AFTER payment_status"
-      );
-      results.push({ column: "payment_proof_url", action: "added" });
-    }
-
-    await connection.end();
-
-    return c.json({ success: true, migrations: results });
-  } catch (err: any) {
-    console.error("[migrate] error:", err);
-    return c.json({ success: false, error: err.message }, 500);
-  }
-});
-
 // Health check + connectivity test
 app.get("/health", async (c) => {
   try {

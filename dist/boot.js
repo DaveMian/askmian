@@ -61069,17 +61069,7 @@ var applicationRouter = createRouter({
   ).mutation(async ({ input }) => {
     const db = getDb();
     let trackingCode = generateTrackingCode();
-    try {
-      let attempts = 0;
-      while (attempts < 5) {
-        const existing = await db.select().from(applications).where(eq(applications.trackingCode, trackingCode));
-        if (existing.length === 0) break;
-        trackingCode = generateTrackingCode();
-        attempts++;
-      }
-    } catch {
-    }
-    const insertData = {
+    const baseInsertData = {
       fullName: input.fullName,
       nationality: input.nationality,
       currentLocation: input.currentLocation || null,
@@ -61095,18 +61085,18 @@ var applicationRouter = createRouter({
       bankStatementUrl: input.bankStatementUrl || null,
       status: "pending"
     };
+    let result;
     try {
-      await db.select({ tc: applications.trackingCode }).from(applications).limit(0);
-      insertData.trackingCode = trackingCode;
+      const insertData = { ...baseInsertData, trackingCode, paymentProofUrl: input.paymentProofUrl || null };
+      result = await db.insert(applications).values(insertData);
     } catch {
       trackingCode = "";
+      try {
+        result = await db.insert(applications).values(baseInsertData);
+      } catch (retryErr) {
+        throw retryErr;
+      }
     }
-    try {
-      await db.select({ pp: applications.paymentProofUrl }).from(applications).limit(0);
-      insertData.paymentProofUrl = input.paymentProofUrl || null;
-    } catch {
-    }
-    const result = await db.insert(applications).values(insertData);
     const appId = Number(result[0].insertId);
     if (resend) {
       try {

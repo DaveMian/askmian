@@ -180,19 +180,8 @@ export const applicationRouter = createRouter({
 
       // Generate unique tracking code
       let trackingCode = generateTrackingCode();
-      try {
-        let attempts = 0;
-        while (attempts < 5) {
-          const existing = await db.select().from(applications).where(eq(applications.trackingCode, trackingCode));
-          if (existing.length === 0) break;
-          trackingCode = generateTrackingCode();
-          attempts++;
-        }
-      } catch {
-        // tracking_code column might not exist yet, continue without uniqueness check
-      }
 
-      const insertData: Record<string, unknown> = {
+      const baseInsertData: Record<string, unknown> = {
         fullName: input.fullName,
         nationality: input.nationality,
         currentLocation: input.currentLocation || null,
@@ -209,24 +198,20 @@ export const applicationRouter = createRouter({
         status: "pending",
       };
 
-      // Only add new columns if they might exist
+      // Try to insert with tracking_code column. If column doesn't exist, fall back.
+      let result;
       try {
-        // Test if tracking_code column exists by doing a dummy query
-        await db.select({ tc: applications.trackingCode }).from(applications).limit(0);
-        insertData.trackingCode = trackingCode;
+        const insertData = { ...baseInsertData, trackingCode, paymentProofUrl: input.paymentProofUrl || null };
+        result = await db.insert(applications).values(insertData as typeof applications.$inferInsert);
       } catch {
-        // Column doesn't exist, skip it
+        // Column(s) missing — retry without them
         trackingCode = "";
+        try {
+          result = await db.insert(applications).values(baseInsertData as typeof applications.$inferInsert);
+        } catch (retryErr) {
+          throw retryErr;
+        }
       }
-
-      try {
-        await db.select({ pp: applications.paymentProofUrl }).from(applications).limit(0);
-        insertData.paymentProofUrl = input.paymentProofUrl || null;
-      } catch {
-        // Column doesn't exist, skip it
-      }
-
-      const result = await db.insert(applications).values(insertData as typeof applications.$inferInsert);
 
       const appId = Number(result[0].insertId);
 
