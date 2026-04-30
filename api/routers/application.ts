@@ -180,16 +180,19 @@ export const applicationRouter = createRouter({
 
       // Generate unique tracking code
       let trackingCode = generateTrackingCode();
-      let attempts = 0;
-      while (attempts < 5) {
-        const existing = await db.select().from(applications).where(eq(applications.trackingCode, trackingCode));
-        if (existing.length === 0) break;
-        trackingCode = generateTrackingCode();
-        attempts++;
+      try {
+        let attempts = 0;
+        while (attempts < 5) {
+          const existing = await db.select().from(applications).where(eq(applications.trackingCode, trackingCode));
+          if (existing.length === 0) break;
+          trackingCode = generateTrackingCode();
+          attempts++;
+        }
+      } catch {
+        // tracking_code column might not exist yet, continue without uniqueness check
       }
 
-      const result = await db.insert(applications).values({
-        trackingCode,
+      const insertData: Record<string, unknown> = {
         fullName: input.fullName,
         nationality: input.nationality,
         currentLocation: input.currentLocation || null,
@@ -200,12 +203,30 @@ export const applicationRouter = createRouter({
         notes: input.notes || null,
         paymentMethod: input.paymentMethod || null,
         paymentStatus: "pending",
-        paymentProofUrl: input.paymentProofUrl || null,
         passportUrl: input.passportUrl || null,
         photoUrl: input.photoUrl || null,
         bankStatementUrl: input.bankStatementUrl || null,
         status: "pending",
-      });
+      };
+
+      // Only add new columns if they might exist
+      try {
+        // Test if tracking_code column exists by doing a dummy query
+        await db.select({ tc: applications.trackingCode }).from(applications).limit(0);
+        insertData.trackingCode = trackingCode;
+      } catch {
+        // Column doesn't exist, skip it
+        trackingCode = "";
+      }
+
+      try {
+        await db.select({ pp: applications.paymentProofUrl }).from(applications).limit(0);
+        insertData.paymentProofUrl = input.paymentProofUrl || null;
+      } catch {
+        // Column doesn't exist, skip it
+      }
+
+      const result = await db.insert(applications).values(insertData as typeof applications.$inferInsert);
 
       const appId = Number(result[0].insertId);
 
@@ -260,8 +281,18 @@ export const applicationRouter = createRouter({
     .input(z.object({ code: z.string() }))
     .query(async ({ input }) => {
       const db = getDb();
-      const rows = await db.select().from(applications).where(eq(applications.trackingCode, input.code.toUpperCase()));
-      return rows[0] || null;
+      try {
+        const rows = await db.select().from(applications).where(eq(applications.trackingCode, input.code.toUpperCase()));
+        return rows[0] || null;
+      } catch {
+        // tracking_code column might not exist yet, fall back to numeric ID
+        const numericId = parseInt(input.code.replace(/\D/g, ''));
+        if (!isNaN(numericId) && numericId > 0) {
+          const rows = await db.select().from(applications).where(eq(applications.id, numericId));
+          return rows[0] || null;
+        }
+        return null;
+      }
     }),
 
   updatePayment: publicQuery

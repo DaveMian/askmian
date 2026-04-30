@@ -61069,15 +61069,17 @@ var applicationRouter = createRouter({
   ).mutation(async ({ input }) => {
     const db = getDb();
     let trackingCode = generateTrackingCode();
-    let attempts = 0;
-    while (attempts < 5) {
-      const existing = await db.select().from(applications).where(eq(applications.trackingCode, trackingCode));
-      if (existing.length === 0) break;
-      trackingCode = generateTrackingCode();
-      attempts++;
+    try {
+      let attempts = 0;
+      while (attempts < 5) {
+        const existing = await db.select().from(applications).where(eq(applications.trackingCode, trackingCode));
+        if (existing.length === 0) break;
+        trackingCode = generateTrackingCode();
+        attempts++;
+      }
+    } catch {
     }
-    const result = await db.insert(applications).values({
-      trackingCode,
+    const insertData = {
       fullName: input.fullName,
       nationality: input.nationality,
       currentLocation: input.currentLocation || null,
@@ -61088,12 +61090,23 @@ var applicationRouter = createRouter({
       notes: input.notes || null,
       paymentMethod: input.paymentMethod || null,
       paymentStatus: "pending",
-      paymentProofUrl: input.paymentProofUrl || null,
       passportUrl: input.passportUrl || null,
       photoUrl: input.photoUrl || null,
       bankStatementUrl: input.bankStatementUrl || null,
       status: "pending"
-    });
+    };
+    try {
+      await db.select({ tc: applications.trackingCode }).from(applications).limit(0);
+      insertData.trackingCode = trackingCode;
+    } catch {
+      trackingCode = "";
+    }
+    try {
+      await db.select({ pp: applications.paymentProofUrl }).from(applications).limit(0);
+      insertData.paymentProofUrl = input.paymentProofUrl || null;
+    } catch {
+    }
+    const result = await db.insert(applications).values(insertData);
     const appId = Number(result[0].insertId);
     if (resend) {
       try {
@@ -61134,8 +61147,17 @@ var applicationRouter = createRouter({
   // Get by tracking code (for public tracking page)
   getByTrackingCode: publicQuery.input(external_exports.object({ code: external_exports.string() })).query(async ({ input }) => {
     const db = getDb();
-    const rows = await db.select().from(applications).where(eq(applications.trackingCode, input.code.toUpperCase()));
-    return rows[0] || null;
+    try {
+      const rows = await db.select().from(applications).where(eq(applications.trackingCode, input.code.toUpperCase()));
+      return rows[0] || null;
+    } catch {
+      const numericId = parseInt(input.code.replace(/\D/g, ""));
+      if (!isNaN(numericId) && numericId > 0) {
+        const rows = await db.select().from(applications).where(eq(applications.id, numericId));
+        return rows[0] || null;
+      }
+      return null;
+    }
   }),
   updatePayment: publicQuery.input(
     external_exports.object({
